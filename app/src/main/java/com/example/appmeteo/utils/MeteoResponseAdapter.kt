@@ -39,7 +39,10 @@ class MeteoResponseAdapter : TypeAdapter<MeteoResponse>() {
         out.name(name).beginArray()
         data.forEachIndexed { index, it ->
             if (it == null) {
-                Log.w("MeteoResponseAdapter", "Null value in $name at index $index. Replacing with 0.0")
+                Log.w(
+                    "MeteoResponseAdapter",
+                    "Null value in $name at index $index. Replacing with 0.0"
+                )
                 out.value(0.0)
             } else {
                 out.value(it)
@@ -49,6 +52,7 @@ class MeteoResponseAdapter : TypeAdapter<MeteoResponse>() {
     }
 
     override fun read(input: JsonReader): MeteoResponse {
+        Log.d("MeteoResponseAdapterStart", "Starting deserialization for MeteoResponse")
         var hourly = HourlyData(emptyList(), emptyList(), emptyList(), emptyList(), emptyList())
 
         input.beginObject()
@@ -70,39 +74,69 @@ class MeteoResponseAdapter : TypeAdapter<MeteoResponse>() {
         var rain = emptyList<Double>()
         var windSpeed = emptyList<Double>()
 
-        input.beginObject()
-        while (input.hasNext()) {
-            when (input.nextName()) {
-                "temperature_2m" -> temperature = readDoubleArray(input)
-                "relative_humidity_2m" -> humidity = readDoubleArray(input)
-                "apparent_temperature" -> apparentTemp = readDoubleArray(input)
-                "rain" -> rain = readDoubleArray(input)
-                "wind_speed_10m" -> windSpeed = readDoubleArray(input)
-                else -> input.skipValue()
+        try {
+            input.beginObject()
+            while (input.hasNext()) {
+                when (input.nextName()) {
+                    "temperature_2m" -> temperature = readDoubleArray(input)
+                    "relative_humidity_2m" -> humidity = readDoubleArray(input)
+                    "apparent_temperature" -> apparentTemp = readDoubleArray(input)
+                    "rain" -> rain = readDoubleArray(input)
+                    "wind_speed_10m" -> windSpeed = readDoubleArray(input)
+                    else -> {
+                        Log.w(
+                            "MeteoResponseAdapter",
+                            "Unexpected key in hourly data: ${input.peek()}"
+                        )
+                        input.skipValue()
+                    }
+                }
             }
+            input.endObject()
+        } catch (e: Exception) {
+            Log.e("MeteoResponseAdapter", "Error reading hourly data: ${e.message}", e)
         }
-        input.endObject()
 
         return HourlyData(temperature, humidity, apparentTemp, rain, windSpeed)
     }
 
+
     private fun readDoubleArray(input: JsonReader): List<Double> {
         val list = mutableListOf<Double>()
-        input.beginArray()
-        while (input.hasNext()) {
-            when (input.peek()) {
-                JsonToken.NULL -> {
-                    input.nextNull()
-                    list.add(0.0) // Replace null with 0.0
-                }
-                JsonToken.NUMBER -> list.add(input.nextDouble())
-                else -> {
-                    Log.e("MeteoResponseAdapter", "Unexpected token in array: ${input.peek()}")
-                    input.skipValue()
+        try {
+            input.beginArray()
+            while (input.hasNext()) {
+                when (input.peek()) {
+                    JsonToken.NULL -> {
+                        input.nextNull()
+                        list.add(0.0) // Replace null with 0.0
+                    }
+
+                    JsonToken.NUMBER -> list.add(input.nextDouble())
+                    JsonToken.STRING -> {
+                        // Si une chaîne est trouvée, essayez de la convertir en double
+                        try {
+                            list.add(input.nextString().toDouble())
+                        } catch (e: NumberFormatException) {
+                            Log.e(
+                                "MeteoResponseAdapter",
+                                "Invalid number format in array: ${e.message}"
+                            )
+                            list.add(0.0) // Valeur par défaut
+                        }
+                    }
+
+                    else -> {
+                        Log.w("MeteoResponseAdapter", "Unexpected token in array: ${input.peek()}")
+                        input.skipValue()
+                    }
                 }
             }
+            input.endArray()
+        } catch (e: Exception) {
+            Log.e("MeteoResponseAdapter", "Error reading array: ${e.message}", e)
         }
-        input.endArray()
         return list
     }
 }
+

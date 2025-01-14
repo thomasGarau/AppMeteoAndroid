@@ -8,12 +8,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.appmeteo.data.model.Ville
 import com.example.appmeteo.ui.components.WeatherInfo
 import com.example.appmeteo.viewmodel.DetailsViewModel
 import com.example.appmeteo.viewmodel.FavoritesViewModel
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+
 
 @Composable
 fun HomeScreen(
@@ -23,12 +26,23 @@ fun HomeScreen(
 ) {
     val favorites = favoritesViewModel.favorites.collectAsState()
     val weatherByCity = detailsViewModel.weatherByCity.collectAsState()
+    val context = LocalContext.current
+    val scrollState = rememberScrollState()
 
     Column(
         modifier = modifier
             .fillMaxSize()
+            .verticalScroll(scrollState)
             .padding(16.dp)
     ) {
+        CurrentLocationWeather(
+            context = context,
+            detailsViewModel = detailsViewModel,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         Text(text = "Favorite Cities", modifier = Modifier.padding(8.dp))
 
         if (favorites.value.isEmpty()) {
@@ -48,14 +62,12 @@ fun HomeScreen(
                     ) {
                         Text(text = "${city.name}, ${city.country}")
 
-                        // Charger les données du cache et appeler l'API
                         LaunchedEffect(city) {
                             detailsViewModel.fetchWeather(city.name, city.latitude, city.longitude)
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // Afficher les données météo pour la ville
                         weatherByCity.value[city.name]?.let {
                             WeatherInfo(it)
                         } ?: Text(text = "Loading cached weather...")
